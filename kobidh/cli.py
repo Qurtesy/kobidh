@@ -1,6 +1,6 @@
+import functools
 import click
-from click import echo
-from kobidh.core import some_function
+from kobidh.core import Apps
 
 
 @click.group()
@@ -8,6 +8,18 @@ def main():
     pass
 
 
-@main.command()
-def test():
-    echo(some_function())
+def _region(func):
+    @click.option("--region", "-r", help="region", required=False)
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+# kobidh apps.create fastapi-basicapp
+@main.command(name="apps.create")
+@_region
+@click.argument("name", type=str)
+def apps_create(name, region):
+    Apps(name).create()
