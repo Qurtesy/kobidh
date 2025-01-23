@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
-from meta import VERSION
+from kobidh.meta import VERSION
 
 with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
-with open("requirements.txt", "r", encoding="utf-8") as f:
+with open("./_requirements/main.txt", "r", encoding="utf-8") as f:
     requirements = f.read().splitlines()
 
 setup(
