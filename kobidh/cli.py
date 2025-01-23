@@ -23,3 +23,11 @@ def _region(func):
 @click.argument("name", type=str)
 def apps_create(name, region):
     Apps(name).create()
+
+
+# kobidh apps.delete fastapi-basicapp
+@main.command(name="apps.delete")
+@_region
+@click.argument("name", type=str)
+def apps_delete(name, region):
+    Apps(name).delete()
