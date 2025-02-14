@@ -1,7 +1,7 @@
 import sys
 import json
 import boto3
-from troposphere import Ref, GetAtt, Base64, Join, FindInMap
+from troposphere import Ref, GetAtt, Base64, Join
 from troposphere.ec2 import (
     LaunchTemplate,
     LaunchTemplateData,
@@ -10,10 +10,8 @@ from troposphere.ec2 import (
     EBSBlockDevice,
 )
 from troposphere.autoscaling import LaunchTemplateSpecification, AutoScalingGroup
-from .config import Config
-from .vpc_config import VPCConfig
-from .iam_config import IAMConfig
-from .ecs_config import ECSConfig
+from kobidh.resource.config import Config, StackOutput
+from kobidh.utils.logging import log
 
 
 class AutoScalingConfig:
@@ -21,17 +19,9 @@ class AutoScalingConfig:
     Contains Auto Scaling configuration details
     """
 
-    def __init__(
-        self,
-        config: Config,
-        vpc_config: VPCConfig,
-        iam_config: IAMConfig,
-        ecs_config: ECSConfig,
-    ):
+    def __init__(self, config: Config, stack_op: StackOutput):
         self.config = config
-        self.vpc_config = vpc_config
-        self.iam_config = iam_config
-        self.ecs_config = ecs_config
+        self.stack_op = stack_op
         self.asg = None
         self.launch_template_name = f"{self.config.name}-launch-template"
 
@@ -47,26 +37,25 @@ class AutoScalingConfig:
 
     def _configure(self):
         # Launch Configuration
+        instance_type = "t2.micro"
         launch_template = LaunchTemplate(
             "ECSLaunchTemplate",
             LaunchTemplateName="ECSLaunchTemplate",
             LaunchTemplateData=LaunchTemplateData(
                 ImageId=self._get_ami_id(),
-                InstanceType="t2.micro",  # Replace with your instance type
+                InstanceType=instance_type,  # Replace with your instance type
                 SecurityGroupIds=[
-                    Ref(self.vpc_config.security_group)
+                    self.stack_op.security_group_name
                 ],  # Replace with your security group ID
                 IamInstanceProfile=IamInstanceProfile(
-                    Name=Ref(self.iam_config.ecs_instance_profile)
+                    Name=self.stack_op.instance_profile_name
                 ),
                 UserData=Base64(
                     Join(
-                        "",
+                        "\n",
                         [
-                            "#!/bin/bash\n",
-                            "echo ECS_CLUSTER=",
-                            Ref(self.ecs_config.ecs_cluster),
-                            " >> /etc/ecs/ecs.config;\n",
+                            "#!/bin/bash",
+                            f"echo ECS_CLUSTER={self.stack_op.ecs_cluster_name} >> /etc/ecs/ecs.config;",
                         ],
                     )
                 ),
@@ -79,13 +68,16 @@ class AutoScalingConfig:
         )
         self.config.template.add_resource(launch_template)
 
+        # Log Launch Template configuration information
+        log(f'Launch Template configiuration for "{instance_type}" instance type added')
+
         # Auto Scaling Group
         self.asg = AutoScalingGroup(
             "AutoScalingGroup",
-            MinSize=1,
+            MinSize=0,
             MaxSize=3,
-            DesiredCapacity="1",
-            VPCZoneIdentifier=[Ref(subnet) for subnet in self.vpc_config.subnets],
+            DesiredCapacity="0",
+            VPCZoneIdentifier=self.stack_op.private_subnet_names.split(":"),
             LaunchTemplate=LaunchTemplateSpecification(
                 LaunchTemplateId=Ref(launch_template),
                 Version=GetAtt(launch_template, "LatestVersionNumber"),
@@ -99,3 +91,6 @@ class AutoScalingConfig:
             ],
         )
         self.config.template.add_resource(self.asg)
+
+        # Log Auto Scaling Group information
+        log(f"Auto Scaling Group configiuration added")
