@@ -71,3 +71,10 @@ def service_create(name):
 @click.argument("name", type=str)
 def service_create(name):
     Service(name).delete()
+
+
+# (heroku container:push web)
+@main.command(name="container:push")
+@click.argument("name", type=str)
+def container_push(name):
+    Container(name).push()
