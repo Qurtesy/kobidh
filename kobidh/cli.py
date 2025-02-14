@@ -1,11 +1,20 @@
 import functools
 import click
-from kobidh.core import Apps
+from kobidh.core import Core, Apps, Service, Container
 
 
 @click.group()
 def main():
     pass
+
+
+def _app(func):
+    @click.option("--app", "-a", help="app", required=False)
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 def _region(func):
@@ -17,17 +26,48 @@ def _region(func):
     return wrapper
 
 
-# kobidh apps.create fastapi-basicapp
+# kobidh setup
+@main.command()
+def setup():
+    Core().setup()
+
+
+# kobidh show
+@main.command()
+def show():
+    Core().show()
+
+
+# kobidh apps.create tomato
 @main.command(name="apps.create")
-@_region
 @click.argument("name", type=str)
-def apps_create(name, region):
+def apps_create(name):
     Apps(name).create()
 
 
-# kobidh apps.delete fastapi-basicapp
-@main.command(name="apps.delete")
-@_region
+# kobidh apps.describe tomato
+@main.command(name="apps.describe")
 @click.argument("name", type=str)
-def apps_delete(name, region):
+def apps_describe(name):
+    Apps(name).describe()
+
+
+# kobidh apps.delete tomato
+@main.command(name="apps.delete")
+@click.argument("name", type=str)
+def apps_delete(name):
     Apps(name).delete()
+
+
+# kobidh service.create (heroku container:push web)
+@main.command(name="service.create")
+@click.argument("name", type=str)
+def service_create(name):
+    Service(name).create()
+
+
+# kobidh service.delete tomato
+@main.command(name="service.delete")
+@click.argument("name", type=str)
+def service_create(name):
+    Service(name).delete()
