@@ -1,19 +1,16 @@
 import boto3
 from moto import mock_aws
-from kobidh.service.infra import Infra
+from kobidh.core import Apps
 from kobidh.utils.logging import log
 
 REGION = "ap-south-1"
 
 
 @mock_aws
-def test_apps_create():
+def test_apps():
     cloud_client = boto3.client("cloudformation", region_name=REGION)
-    config = Infra.configure("fastapi-basicapp", REGION)
-    log(config.template.to_json(indent=None))
-    response = {"ResponseMetadata": {"HTTPStatusCode": 404}}
-    response = cloud_client.create_stack(
-        StackName="basicAppStack", TemplateBody=config.template.to_json()
-    )
-    log(response)
-    assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
+    apps = Apps("tomato", REGION)
+    # Test apps.create command
+    apps.create()
+    # Test apps.delete command
+    apps.delete()

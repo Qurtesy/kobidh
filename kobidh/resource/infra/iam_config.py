@@ -1,7 +1,6 @@
 from kobidh.utils.format import camelcase
 from troposphere import Ref, Output
 from troposphere.iam import Role, Policy, InstanceProfile
-from kobidh.resource.infra.attrs import Attrs
 from kobidh.resource.config import Config
 
 
@@ -12,13 +11,12 @@ class IAMConfig:
 
     def __init__(self, config: Config):
         self.config = config
-        self.attrs = Attrs(self.config.name)
         self.ecs_instance_profile = None
 
     def _configure(self):
         # IAM Role for ECS EC2 Instances
         ecs_instance_role = Role(
-            camelcase(self.attrs.ecs_role_name),
+            camelcase(self.config.attrs.ecs_role_name),
             AssumeRolePolicyDocument={
                 "Version": "2012-10-17",
                 "Statement": [
@@ -31,7 +29,7 @@ class IAMConfig:
             },
             Policies=[
                 Policy(
-                    PolicyName=camelcase(self.attrs.ecs_policy_name),
+                    PolicyName=camelcase(self.config.attrs.ecs_policy_name),
                     PolicyDocument={
                         "Version": "2012-10-17",
                         "Statement": [
@@ -60,7 +58,9 @@ class IAMConfig:
                     },
                 ),
                 Policy(
-                    PolicyName=camelcase(self.attrs.ecs_tag_resource_policy_name),
+                    PolicyName=camelcase(
+                        self.config.attrs.ecs_tag_resource_policy_name
+                    ),
                     PolicyDocument={
                         "Version": "2012-10-17",
                         "Statement": [
@@ -86,7 +86,7 @@ class IAMConfig:
 
         # IAM Instance Profile
         self.ecs_instance_profile = InstanceProfile(
-            camelcase(self.attrs.ecs_profile_name),
+            camelcase(self.config.attrs.ecs_profile_name),
             Roles=[Ref(ecs_instance_role)],
         )
         self.config.template.add_resource(self.ecs_instance_profile)

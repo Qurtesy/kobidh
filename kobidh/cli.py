@@ -5,6 +5,7 @@ from kobidh.core import Core, Apps, Service, Container
 
 @click.group()
 def main():
+    """CLI tool for automating the containerized application deployment process"""
     pass
 
 
@@ -50,6 +51,13 @@ def apps_create(name):
 @click.argument("name", type=str)
 def apps_describe(name):
     Apps(name).describe()
+
+
+# kobidh apps.info tomato
+@main.command(name="apps.info")
+@click.argument("name", type=str)
+def apps_info(name):
+    Apps(name).info()
 
 
 # kobidh apps.delete tomato

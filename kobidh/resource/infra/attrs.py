@@ -1,7 +1,9 @@
 class Attrs:
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
+        self.infra_stack_name = f"{name}-infra-stack"
+        self.provision_stack_name = f"{name}-provision-stack"
         # VPC Configuration attribute names
         self.vpc_name = f"{name}-vpc"
         self.internet_gateway_name = f"{name}-ig"
@@ -9,6 +11,7 @@ class Attrs:
         self.route_table_name = f"{name}-route"
         self.nat_gateway_name = f"{name}-nat"
         self.internet_gateway_route = f"{name}-ig-route"
+        self.nat_route_name = f"{name}-nat-route"
         self.security_group_name = f"{name}-sg"
         # IAM Configuration attribute names
         self.ecs_policy_name = f"{name}-ecs-policy"

@@ -12,14 +12,13 @@ class ECRConfig:
 
     def __init__(self, config: Config):
         self.config = config
-        self.attrs = Attrs(self.config.name)
         self.default_service = "web"
         self.ecr = None
 
     def _configure(self):
         self.ecr = Repository(
-            camelcase(self.attrs.ecr_name),
-            RepositoryName=f"{self.attrs.ecr_name}/{self.default_service}",  # Change to your desired repository name
+            camelcase(self.config.attrs.ecr_name),
+            RepositoryName=f"{self.config.attrs.ecr_name}/{self.default_service}",  # Change to your desired repository name
         )
         self.config.template.add_resource(self.ecr)
         self.config.template.add_output(

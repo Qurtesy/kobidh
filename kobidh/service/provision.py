@@ -1,8 +1,8 @@
 import boto3
-import traceback
 import subprocess
 from kobidh.utils.format import camelcase
 from botocore.exceptions import ClientError
+from kobidh.service.infra import Infra
 from kobidh.resource.config import Config, StackOutput
 from kobidh.resource.provision.autoscaling_config import AutoScalingConfig
 from kobidh.resource.provision.service_config import ServiceConfig
@@ -10,59 +10,10 @@ from kobidh.utils.logging import log, log_err, log_warning
 
 
 class Provision:
-    @staticmethod
-    def _validate_cloudformation_stack(name):
-        ecs_client = boto3.client("ecs")
-        cloudformation_client = boto3.client("cloudformation")
-        stack_name = camelcase(f"{name}-app-stack")
-        try:
-            response = cloudformation_client.describe_stacks(StackName=stack_name)
-            stack = response["Stacks"][0]
-            outputs = stack["Outputs"]
-            stack_op = StackOutput()
-            for op in outputs:
-                if op["OutputKey"] == "ClusterName":
-                    stack_op.ecs_cluster_name = op["OutputValue"]
-                if op["OutputKey"] == "ECRUri":
-                    stack_op.ecr_uri = op["OutputValue"]
-                if op["OutputKey"] == "PublicSubnetNames":
-                    stack_op.public_subnet_names = op["OutputValue"]
-                if op["OutputKey"] == "PrivateSubnetNames":
-                    stack_op.private_subnet_names = op["OutputValue"]
-                if op["OutputKey"] == "SecurityGroupName":
-                    stack_op.security_group_name = op["OutputValue"]
-                if op["OutputKey"] == "InstanceProfileName":
-                    stack_op.instance_profile_name = op["OutputValue"]
-            if not stack_op.ecs_cluster_name:
-                log_err(f"Cluster name not found in the stack output.")
-            if not stack_op.ecr_uri:
-                log_err(f"Container Registry URI not found in the stack output.")
-            if not stack_op.public_subnet_names:
-                log_err(f"Public Subnet names not found in the stack output.")
-            if not stack_op.security_group_name:
-                log_err(f"Security Group name not found in the stack output.")
-            if not stack_op.instance_profile_name:
-                log_err(f"Instance Profile name not found in the stack output.")
-            # Validating the cluster exist
-            response = ecs_client.describe_clusters(
-                clusters=[stack_op.ecs_cluster_name]
-            )
-            ecs_cluster = response["clusters"][0]
-            return stack_op
-        except ClientError as e:
-            # If stack does not exist, create it
-            if "does not exist" in str(e):
-                log_err(f'Stack "{stack_name}" does not exist')
-            else:
-                traceback.print_exc()
-                log_err(f"Unexpected error: {e}")
-        except Exception as e:
-            traceback.print_exc()
-            log_err(f"Unexpected error: {e}")
 
     @staticmethod
     def configure(name: str, region: str = None):
-        stack_op = Provision._validate_cloudformation_stack(name)
+        stack_op = Infra._validate_app_stack(name)
 
         config = Config(name, region)
         config.template.set_description(

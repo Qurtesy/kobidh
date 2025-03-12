@@ -28,11 +28,10 @@ class VPCConfig:
 
     def __init__(self, config: Config):
         self.config = config
-        self.attrs = Attrs(self.config.name)
 
         cidr = ipaddress.IPv4Network("10.10.0.0/16")
         self.cidr = str(cidr)
-        self.route_table = None
+        self.private_route_table = None
         subnets_list = list(cidr.subnets(new_prefix=22))
         self.subnets_config = []
         index = 0
@@ -40,18 +39,18 @@ class VPCConfig:
         azones_count = len(azones)
         for az in azones:
             # Public Subnets configuration
-            self.subnets_config.append(
-                {
-                    "name": self.attrs.public_subnet_name(az),
-                    "az": az,
-                    "cidr": str(subnets_list[index]),
-                    "is_public": True,
-                }
-            )
+            # self.subnets_config.append(
+            #     {
+            #         "name": self.config.attrs.public_subnet_name(az),
+            #         "az": az,
+            #         "cidr": str(subnets_list[index]),
+            #         "is_public": True,
+            #     }
+            # )
             # Private Subnets configuration
             self.subnets_config.append(
                 {
-                    "name": self.attrs.private_subnet_name(az),
+                    "name": self.config.attrs.private_subnet_name(az),
                     "az": az,
                     "cidr": str(subnets_list[index + azones_count]),
                     "is_public": False,
@@ -61,9 +60,7 @@ class VPCConfig:
         self.public_subnets = []
         self.private_subnets = []
 
-        self.eip_allocation_id = prompt("Allocation ID Elastic IP for NAT")
-        self._validate_eip(self.eip_allocation_id)
-
+        self.eip_allocation_id = None
         self.security_group = None
 
     def _get_azs(self):
@@ -91,37 +88,30 @@ class VPCConfig:
             log_err(f"Error fetching availability zones: {str(e)}")
             return []
 
-    def _validate_eip(self, eip_allocation_id: str):
-        if not eip_allocation_id.startswith("eipalloc-"):
-            raise Exception(
-                'Elastic IP allocation Id should be in this "eipalloc-<alpha-numeric-id>" format'
-            )
-        try:
-            ec2_client = boto3.client("ec2", region_name=self.config.region)
-            eip_response = ec2_client.describe_addresses(
-                AllocationIds=[eip_allocation_id]
-            )
-            print(eip_response["Addresses"][0])
-        except ClientError as e:
-            # If stack does not exist, create it
-            if "does not exist" in str(e):
-                log_err(f'Elastic IP "{eip_allocation_id}" does not exist')
-            else:
-                traceback.print_exc()
-                log_err(f"Unexpected error: {e}")
-            raise Exception(
-                "Valid Elastic IP allocation Id is required in order to proceed"
-            )
+    def _allocate_eip(self):
+        client = boto3.client("ec2")
+        response = client.allocate_address(
+            Domain="standard",
+            TagSpecifications=[
+                {"Tags": [{"Key": "environment", "Value": self.config.name}]}
+            ],
+        )
+        return response["AllocationId"]
+
+    @staticmethod
+    def _release_eip(allocation_id):
+        client = boto3.client("ec2")
+        client.release_address(AllocationId=allocation_id)
 
     def _configure(self):
         vpc_tags = [
             {"Key": "Publisher", "Value": "kobidh"},
             {"Key": "environment", "Value": self.config.name},
-            {"Key": "Name", "Value": self.attrs.vpc_name},
+            {"Key": "Name", "Value": self.config.attrs.vpc_name},
         ]
         # VPC
         vpc = VPC(
-            camelcase(self.attrs.vpc_name),
+            camelcase(self.config.attrs.vpc_name),
             CidrBlock=self.cidr,
             EnableDnsSupport=True,  # Enable DNS Support
             EnableDnsHostnames=True,  # Enable DNS Hostnames
@@ -136,15 +126,15 @@ class VPCConfig:
         log(f"CIDR: {self.cidr}")
 
         self.internet_gateway = InternetGateway(
-            camelcase(self.attrs.internet_gateway_name),
+            camelcase(self.config.attrs.internet_gateway_name),
             Tags=[
-                {"Key": "Name", "Value": self.attrs.internet_gateway_name},
+                {"Key": "Name", "Value": self.config.attrs.internet_gateway_name},
                 {"Key": "environment", "Value": self.config.name},
             ],
         )
         self.config.template.add_resource(self.internet_gateway)
         vpc_gateway_attachment = VPCGatewayAttachment(
-            camelcase(self.attrs.internet_gateway_attachment_name),
+            camelcase(self.config.attrs.internet_gateway_attachment_name),
             InternetGatewayId=Ref(self.internet_gateway),
             VpcId=Ref(self.vpc),
         )
@@ -153,15 +143,15 @@ class VPCConfig:
         # Log Internet Gateway configuration information
         log("Internet Gateway configiuration attached to VPC")
 
-        self.route_table = RouteTable(
-            camelcase(self.attrs.route_table_name),
+        self.private_route_table = RouteTable(
+            camelcase(self.config.attrs.route_table_name),
             VpcId=Ref(self.vpc),
             Tags=[
-                {"Key": "Name", "Value": self.attrs.route_table_name},
+                {"Key": "Name", "Value": self.config.attrs.route_table_name},
                 {"Key": "environment", "Value": self.config.name},
             ],
         )
-        self.config.template.add_resource(self.route_table)
+        self.config.template.add_resource(self.private_route_table)
         public_subnet_resource_refs = []
         private_subnet_resource_refs = []
         for subnet in self.subnets_config:
@@ -188,11 +178,13 @@ class VPCConfig:
                 self.private_subnets.append(subnet_resource)
             subnet_route_table_association = SubnetRouteTableAssociation(
                 camelcase(
-                    self.attrs.public_subnet_route_association_name(subnet["az"])
+                    self.config.attrs.public_subnet_route_association_name(subnet["az"])
                     if subnet["is_public"]
-                    else self.attrs.private_subnet_route_association_name(subnet["az"])
+                    else self.config.attrs.private_subnet_route_association_name(
+                        subnet["az"]
+                    )
                 ),
-                RouteTableId=Ref(self.route_table),
+                RouteTableId=Ref(self.private_route_table),
                 SubnetId=Ref(subnet_resource),
             )
             self.config.template.add_resource(subnet_route_table_association)
@@ -218,38 +210,46 @@ class VPCConfig:
                 Value=Join(":", private_subnet_resource_refs),
             )
         )
-        nat_gateway = NatGateway(
-            camelcase(self.attrs.nat_gateway_name),
+        self.eip_allocation_id = self._allocate_eip()
+        self.config.template.add_output(
+            Output(
+                "ElasticIPAllocationId",
+                Description=f"The allocation id of Elastic IP",
+                Value=self.eip_allocation_id,
+            )
+        )
+        self.nat_gateway = NatGateway(
+            camelcase(self.config.attrs.nat_gateway_name),
             AllocationId=self.eip_allocation_id,
             SubnetId=Ref(self.private_subnets[0]),
             Tags=[
-                {"Key": "Name", "Value": self.attrs.nat_gateway_name},
+                {"Key": "Name", "Value": self.config.attrs.nat_gateway_name},
                 {"Key": "environment", "Value": self.config.name},
             ],
         )
-        self.config.template.add_resource(nat_gateway)
+        self.config.template.add_resource(self.nat_gateway)
 
-        internet_gateway_route = Route(
-            camelcase(self.attrs.internet_gateway_route),
+        nat_gateway_route = Route(
+            camelcase(self.config.attrs.nat_route_name),
             DestinationCidrBlock="0.0.0.0/0",
-            GatewayId=Ref(self.internet_gateway),
-            RouteTableId=Ref(self.route_table),
+            NatGatewayId=Ref(self.nat_gateway),
+            RouteTableId=Ref(self.private_route_table),
         )
-        self.config.template.add_resource(internet_gateway_route)
+        self.config.template.add_resource(nat_gateway_route)
 
-        # Log Internet Gateway configuration information
-        log("Internet Gateway configiuration attached to Route Table")
+        # Log NAT Gateway configuration information
+        log("NAT Gateway configiuration attached to Route Table")
 
         sg_tags = [
             {"Key": "Publisher", "Value": "kobidh"},
             {"Key": "environment", "Value": self.config.name},
-            {"Key": "Name", "Value": self.attrs.security_group_name},
+            {"Key": "Name", "Value": self.config.attrs.security_group_name},
         ]
         # Security Group to allow all the inbound traffic for ECS
         security_group_description = "Allow all inbound traffic for ECS"
         self.security_group = SecurityGroup(
-            camelcase(self.attrs.security_group_name),
-            GroupName=camelcase(self.attrs.security_group_name),
+            camelcase(self.config.attrs.security_group_name),
+            GroupName=camelcase(self.config.attrs.security_group_name),
             GroupDescription=security_group_description,
             SecurityGroupIngress=[
                 # Allow SSH

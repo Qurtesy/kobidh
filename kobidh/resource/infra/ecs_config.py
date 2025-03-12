@@ -12,12 +12,11 @@ class ECSConfig:
 
     def __init__(self, config: Config):
         self.config = config
-        self.attrs = Attrs(self.config.name)
         self.ecs_cluster = None
 
     def _configure(self):
         # ECS Cluster
-        self.ecs_cluster = Cluster(camelcase(self.attrs.cluster_name))
+        self.ecs_cluster = Cluster(camelcase(self.config.attrs.cluster_name))
         self.config.template.add_resource(self.ecs_cluster)
         self.config.template.add_output(
             Output(

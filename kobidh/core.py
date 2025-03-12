@@ -87,13 +87,16 @@ class Apps:
             echo(f'Creating app "{self.name}" for "{self.region}"..')
             config = Infra.configure(self.name, self.region)
             echo(f'App "{self.name}" configuration created..')
-            Infra.apply(config.name, config.region, config.template)
+            Infra.apply(config)
             echo(f'App "{self.name}" configuration is applied..')
         except Exception as e:
             log_err(str(e))
 
     def describe(self):
         Infra.describe(self.name, self.region)
+
+    def info(self):
+        Infra.info(self.name, self.region)
 
     def delete(self):
         echo(f'Deleting app "{self.name}"..')
@@ -107,9 +110,12 @@ class Service:
         self.region = region if region else self.session.region_name
 
     def create(self):
-        echo(f'Provisioning app "{self.app}"..')
-        config = Provision.configure(self.app, self.region)
-        Provision.apply(config)
+        try:
+            echo(f'Provisioning app "{self.app}"..')
+            config = Provision.configure(self.app, self.region)
+            Provision.apply(config)
+        except Exception as e:
+            log_err(str(e))
 
     def delete(self):
         echo(f'Removing app "{self.app}" provision..')
