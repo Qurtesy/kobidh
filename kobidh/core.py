@@ -1,13 +1,36 @@
 import os
 import boto3
+import botocore
 import logging
 from click import echo, prompt
 from kobidh.meta import DIR, DEFAULT_FILE
-from kobidh.service.infra import Infra
-from kobidh.service.provision import Provision
+from kobidh.resource.infra import Infra
+from kobidh.resource.provision import Provision
 from kobidh.utils.logging import log_err
 
 logger = logging.getLogger(__name__)
+
+def aws_credentails(func):
+    def wrapper(*args, **kwargs):
+        try:
+            session = boto3.Session()
+            credentials = session.get_credentials()
+
+            if credentials is None:
+                raise Exception("AWS credentials not found. Run `aws configure` to set them up.")
+            
+            client = session.client("sts")
+            identity = client.get_caller_identity()
+            echo(f"AWS credentials are set up correctly. Account ID: {identity['Account']}")
+
+        except botocore.exceptions.NoCredentialsError:
+            raise Exception("No AWS credentials found. Run `aws configure` to set them up.")
+        except botocore.exceptions.PartialCredentialsError:
+            raise Exception("Incomplete AWS credentials found. Please check your AWS configuration.")
+        except Exception as e:
+            raise Exception(f"An error occurred: {e}")
+        return func(*args, **kwargs)
+    return wrapper
 
 
 class Config:
@@ -62,11 +85,13 @@ class Core:
         self.session = boto3.session.Session()
         self.config = Config()
 
+    @aws_credentails
     def setup(self):
         self.config.app = prompt("application")
         self.config.region = prompt("region", default=self.session.region_name)
         self.config.get_config()
 
+    @aws_credentails
     def show(self):
         echo()
         echo(f"Configuration:")
@@ -82,16 +107,18 @@ class Apps:
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
+    @aws_credentails
     def create(self):
         try:
             echo(f'Creating app "{self.name}" for "{self.region}"..')
             config = Infra.configure(self.name, self.region)
             echo(f'App "{self.name}" configuration created..')
-            Infra.apply(config)
+            Infra.apply(config.name, config.region, config.template)
             echo(f'App "{self.name}" configuration is applied..')
         except Exception as e:
             log_err(str(e))
 
+    @aws_credentails
     def describe(self):
         Infra.describe(self.name, self.region)
 
@@ -109,6 +136,7 @@ class Service:
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
+    @aws_credentails
     def create(self):
         try:
             echo(f'Provisioning app "{self.app}"..')
@@ -117,6 +145,7 @@ class Service:
         except Exception as e:
             log_err(str(e))
 
+    @aws_credentails
     def delete(self):
         echo(f'Removing app "{self.app}" provision..')
         Provision.delete(self.app, self.region)
@@ -128,5 +157,6 @@ class Container:
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
+    @aws_credentails
     def push(self):
         Provision.push(self.app, self.region)

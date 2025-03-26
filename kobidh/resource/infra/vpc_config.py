@@ -39,14 +39,14 @@ class VPCConfig:
         azones_count = len(azones)
         for az in azones:
             # Public Subnets configuration
-            # self.subnets_config.append(
-            #     {
-            #         "name": self.config.attrs.public_subnet_name(az),
-            #         "az": az,
-            #         "cidr": str(subnets_list[index]),
-            #         "is_public": True,
-            #     }
-            # )
+            self.subnets_config.append(
+                {
+                    "name": self.config.attrs.public_subnet_name(az),
+                    "az": az,
+                    "cidr": str(subnets_list[index]),
+                    "is_public": True,
+                }
+            )
             # Private Subnets configuration
             self.subnets_config.append(
                 {
@@ -90,12 +90,7 @@ class VPCConfig:
 
     def _allocate_eip(self):
         client = boto3.client("ec2")
-        response = client.allocate_address(
-            Domain="standard",
-            TagSpecifications=[
-                {"Tags": [{"Key": "environment", "Value": self.config.name}]}
-            ],
-        )
+        response = client.allocate_address(Domain="vpc")
         return response["AllocationId"]
 
     @staticmethod
