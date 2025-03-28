@@ -31,7 +31,7 @@ class VPCConfig:
 
         cidr = ipaddress.IPv4Network("10.10.0.0/16")
         self.cidr = str(cidr)
-        self.private_route_table = None
+        self.route_table = None
         subnets_list = list(cidr.subnets(new_prefix=22))
         self.subnets_config = []
         index = 0
@@ -138,7 +138,7 @@ class VPCConfig:
         # Log Internet Gateway configuration information
         log("Internet Gateway configiuration attached to VPC")
 
-        self.private_route_table = RouteTable(
+        self.route_table = RouteTable(
             camelcase(self.config.attrs.route_table_name),
             VpcId=Ref(self.vpc),
             Tags=[
@@ -146,7 +146,7 @@ class VPCConfig:
                 {"Key": "environment", "Value": self.config.name},
             ],
         )
-        self.config.template.add_resource(self.private_route_table)
+        self.config.template.add_resource(self.route_table)
         public_subnet_resource_refs = []
         private_subnet_resource_refs = []
         for subnet in self.subnets_config:
@@ -179,7 +179,7 @@ class VPCConfig:
                         subnet["az"]
                     )
                 ),
-                RouteTableId=Ref(self.private_route_table),
+                RouteTableId=Ref(self.route_table),
                 SubnetId=Ref(subnet_resource),
             )
             self.config.template.add_resource(subnet_route_table_association)
@@ -205,32 +205,34 @@ class VPCConfig:
                 Value=Join(":", private_subnet_resource_refs),
             )
         )
-        self.eip_allocation_id = self._allocate_eip()
-        self.config.template.add_output(
-            Output(
-                "ElasticIPAllocationId",
-                Description=f"The allocation id of Elastic IP",
-                Value=self.eip_allocation_id,
-            )
-        )
-        self.nat_gateway = NatGateway(
-            camelcase(self.config.attrs.nat_gateway_name),
-            AllocationId=self.eip_allocation_id,
-            SubnetId=Ref(self.private_subnets[0]),
-            Tags=[
-                {"Key": "Name", "Value": self.config.attrs.nat_gateway_name},
-                {"Key": "environment", "Value": self.config.name},
-            ],
-        )
-        self.config.template.add_resource(self.nat_gateway)
+        # self.eip_allocation_id = self._allocate_eip()
+        # self.config.template.add_output(
+        #     Output(
+        #         "ElasticIPAllocationId",
+        #         Description=f"The allocation id of Elastic IP",
+        #         Value=self.eip_allocation_id,
+        #     )
+        # )
+        # self.nat_gateway = NatGateway(
+        #     camelcase(self.config.attrs.nat_gateway_name),
+        #     AllocationId=self.eip_allocation_id,
+        #     SubnetId=Ref(self.private_subnets[0]),
+        #     Tags=[
+        #         {"Key": "Name", "Value": self.config.attrs.nat_gateway_name},
+        #         {"Key": "environment", "Value": self.config.name},
+        #     ],
+        # )
+        # self.config.template.add_resource(self.nat_gateway)
 
-        nat_gateway_route = Route(
+        # NOTE: Currently "Destination" 0.0.0.0/0 is routed to "Target" Internet Gateway for Initial POC
+        gateway_route = Route(
             camelcase(self.config.attrs.nat_route_name),
             DestinationCidrBlock="0.0.0.0/0",
-            NatGatewayId=Ref(self.nat_gateway),
-            RouteTableId=Ref(self.private_route_table),
+            # NatGatewayId=Ref(self.nat_gateway),
+            GatewayId=Ref(self.internet_gateway),
+            RouteTableId=Ref(self.route_table),
         )
-        self.config.template.add_resource(nat_gateway_route)
+        self.config.template.add_resource(gateway_route)
 
         # Log NAT Gateway configuration information
         log("NAT Gateway configiuration attached to Route Table")

@@ -1,36 +1,14 @@
 import os
 import boto3
-import botocore
 import logging
 from click import echo, prompt
 from kobidh.meta import DIR, DEFAULT_FILE
 from kobidh.resource.infra import Infra
 from kobidh.resource.provision import Provision
 from kobidh.utils.logging import log_err
+from kobidh.utils.decorators import aws_credentails
 
 logger = logging.getLogger(__name__)
-
-def aws_credentails(func):
-    def wrapper(*args, **kwargs):
-        try:
-            session = boto3.Session()
-            credentials = session.get_credentials()
-
-            if credentials is None:
-                raise Exception("AWS credentials not found. Run `aws configure` to set them up.")
-            
-            client = session.client("sts")
-            identity = client.get_caller_identity()
-            echo(f"AWS credentials are set up correctly. Account ID: {identity['Account']}")
-
-        except botocore.exceptions.NoCredentialsError:
-            raise Exception("No AWS credentials found. Run `aws configure` to set them up.")
-        except botocore.exceptions.PartialCredentialsError:
-            raise Exception("Incomplete AWS credentials found. Please check your AWS configuration.")
-        except Exception as e:
-            raise Exception(f"An error occurred: {e}")
-        return func(*args, **kwargs)
-    return wrapper
 
 
 class Config:
@@ -102,12 +80,12 @@ class Core:
 
 
 class Apps:
+    @aws_credentails
     def __init__(self, name: str, region: str = None):
         self.name = name
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
-    @aws_credentails
     def create(self):
         try:
             echo(f'Creating app "{self.name}" for "{self.region}"..')
@@ -118,7 +96,6 @@ class Apps:
         except Exception as e:
             log_err(str(e))
 
-    @aws_credentails
     def describe(self):
         Infra.describe(self.name, self.region)
 

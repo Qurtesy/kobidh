@@ -6,6 +6,7 @@ from troposphere.ec2 import (
     LaunchTemplate,
     LaunchTemplateData,
     IamInstanceProfile,
+    NetworkInterfaces,
     LaunchTemplateBlockDeviceMapping,
     EBSBlockDevice,
 )
@@ -44,12 +45,17 @@ class AutoScalingConfig:
             LaunchTemplateData=LaunchTemplateData(
                 ImageId=self._get_ami_id(),
                 InstanceType=instance_type,  # Replace with your instance type
-                SecurityGroupIds=[
-                    self.stack_op.security_group_name
-                ],  # Replace with your security group ID
+                # SecurityGroupIds=[self.stack_op.security_group_name],
                 IamInstanceProfile=IamInstanceProfile(
                     Name=self.stack_op.instance_profile_name
                 ),
+                NetworkInterfaces=[
+                    NetworkInterfaces(
+                        # AssociateCarrierIpAddress=True,
+                        DeviceIndex=0,
+                        Groups=[self.stack_op.security_group_name]
+                    )
+                ],
                 UserData=Base64(
                     Join(
                         "\n",
@@ -77,7 +83,8 @@ class AutoScalingConfig:
             MinSize=0,
             MaxSize=3,
             DesiredCapacity="0",
-            VPCZoneIdentifier=self.stack_op.private_subnet_names.split(":"),
+            # NOTE: Public subnet is attached to auto scaling group currently for initial POC
+            VPCZoneIdentifier=self.stack_op.public_subnet_names.split(":"),
             LaunchTemplate=LaunchTemplateSpecification(
                 LaunchTemplateId=Ref(launch_template),
                 Version=GetAtt(launch_template, "LatestVersionNumber"),

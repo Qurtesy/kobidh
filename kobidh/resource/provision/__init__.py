@@ -17,7 +17,11 @@ class Provision:
         stack_name = camelcase(f"{name}-app-stack")
         try:
             response = cloudformation_client.describe_stacks(StackName=stack_name)
+            assert "Stacks" in response, f"\"Stack\" key not found in the Cloudformation stack \"{stack_name}\""
+            assert len(response["Stacks"]) > 0, f"Stack not found in the Cloudformation stack \"{stack_name}\""
             stack = response["Stacks"][0]
+            assert "Outputs" in stack, f"\"Outputs\" key not found in the Cloudformation stack \"{stack_name}\",\
+                  please wait for sometime after creating an app and try again"
             outputs = stack["Outputs"]
             stack_op = StackOutput()
             for op in outputs:
@@ -49,6 +53,9 @@ class Provision:
             )
             ecs_cluster = response["clusters"][0]
             return stack_op
+        except AssertionError as e:
+            log_err(f"Assertion error: {e}")
+            raise e
         except ClientError as e:
             # If stack does not exist, create it
             if "does not exist" in str(e):
