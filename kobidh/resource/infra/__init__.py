@@ -63,7 +63,6 @@ class Infra:
         response = None
         try:
             # Check if the stack exists
-            print(stack_name)
             cloud_client.describe_stacks(StackName=stack_name)
             log(f"Stack {stack_name} exists. Updating it...")
 

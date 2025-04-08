@@ -59,17 +59,16 @@ class Config:
 
 
 class Core:
+    @aws_credentails
     def __init__(self):
         self.session = boto3.session.Session()
         self.config = Config()
 
-    @aws_credentails
     def setup(self):
         self.config.app = prompt("application")
         self.config.region = prompt("region", default=self.session.region_name)
         self.config.get_config()
 
-    @aws_credentails
     def show(self):
         echo()
         echo(f"Configuration:")
@@ -108,12 +107,12 @@ class Apps:
 
 
 class Service:
+    @aws_credentails
     def __init__(self, app: str, region: str = None):
         self.app = app
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
-    @aws_credentails
     def create(self):
         try:
             echo(f'Provisioning app "{self.app}"..')
@@ -122,18 +121,17 @@ class Service:
         except Exception as e:
             log_err(str(e))
 
-    @aws_credentails
     def delete(self):
         echo(f'Removing app "{self.app}" provision..')
         Provision.delete(self.app, self.region)
 
 
 class Container:
+    @aws_credentails
     def __init__(self, app: str, region: str = None):
         self.app = app
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
-    @aws_credentails
     def push(self):
         Provision.push(self.app, self.region)

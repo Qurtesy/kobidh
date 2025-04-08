@@ -1,5 +1,4 @@
 import boto3
-import traceback
 import subprocess
 from kobidh.utils.format import camelcase
 from botocore.exceptions import ClientError
@@ -10,68 +9,11 @@ from kobidh.utils.logging import log, log_err, log_warning
 
 
 class Provision:
-    @staticmethod
-    def _validate_cloudformation_stack(name):
-        ecs_client = boto3.client("ecs")
-        cloudformation_client = boto3.client("cloudformation")
-        stack_name = camelcase(f"{name}-app-stack")
-        try:
-            response = cloudformation_client.describe_stacks(StackName=stack_name)
-            assert "Stacks" in response, f"\"Stack\" key not found in the Cloudformation stack \"{stack_name}\""
-            assert len(response["Stacks"]) > 0, f"Stack not found in the Cloudformation stack \"{stack_name}\""
-            stack = response["Stacks"][0]
-            assert "Outputs" in stack, f"\"Outputs\" key not found in the Cloudformation stack \"{stack_name}\",\
-                  please wait for sometime after creating an app and try again"
-            outputs = stack["Outputs"]
-            stack_op = StackOutput()
-            for op in outputs:
-                if op["OutputKey"] == "ClusterName":
-                    stack_op.ecs_cluster_name = op["OutputValue"]
-                if op["OutputKey"] == "ECRUri":
-                    stack_op.ecr_uri = op["OutputValue"]
-                if op["OutputKey"] == "PublicSubnetNames":
-                    stack_op.public_subnet_names = op["OutputValue"]
-                if op["OutputKey"] == "PrivateSubnetNames":
-                    stack_op.private_subnet_names = op["OutputValue"]
-                if op["OutputKey"] == "SecurityGroupName":
-                    stack_op.security_group_name = op["OutputValue"]
-                if op["OutputKey"] == "InstanceProfileName":
-                    stack_op.instance_profile_name = op["OutputValue"]
-            if not stack_op.ecs_cluster_name:
-                log_err(f"Cluster name not found in the stack output.")
-            if not stack_op.ecr_uri:
-                log_err(f"Container Registry URI not found in the stack output.")
-            if not stack_op.public_subnet_names:
-                log_err(f"Public Subnet names not found in the stack output.")
-            if not stack_op.security_group_name:
-                log_err(f"Security Group name not found in the stack output.")
-            if not stack_op.instance_profile_name:
-                log_err(f"Instance Profile name not found in the stack output.")
-            # Validating the cluster exist
-            response = ecs_client.describe_clusters(
-                clusters=[stack_op.ecs_cluster_name]
-            )
-            ecs_cluster = response["clusters"][0]
-            return stack_op
-        except AssertionError as e:
-            log_err(f"Assertion error: {e}")
-            raise e
-        except ClientError as e:
-            # If stack does not exist, create it
-            if "does not exist" in str(e):
-                log_err(f'Stack "{stack_name}" does not exist')
-            else:
-                traceback.print_exc()
-                log_err(f"Unexpected error: {e}")
-            raise e
-        except Exception as e:
-            traceback.print_exc()
-            log_err(f"Unexpected error: {e}")
-            raise e
 
     @staticmethod
     def configure(name: str, region: str = None):
-        stack_op = Provision._validate_cloudformation_stack(name)
+        stack_op = StackOutput()
+        stack_op.validate_cloudformation_stack(name)
 
         config = Config(name, region)
         config.template.set_description(
