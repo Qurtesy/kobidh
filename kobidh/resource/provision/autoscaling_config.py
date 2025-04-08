@@ -20,11 +20,11 @@ class AutoScalingConfig:
     Contains Auto Scaling configuration details
     """
 
-    def __init__(self, config: Config, stack_op: StackOutput):
+    def __init__(self, config: Config, params, stack_op: StackOutput):
         self.config = config
+        self.params = params
         self.stack_op = stack_op
         self.asg = None
-        self.launch_template_name = f"{self.config.name}-launch-template"
 
     def _get_ami_id(self):
         # Pick from https://docs.aws.amazon.com/AmazonECS/latest/developerguide/al2ami.html
@@ -53,7 +53,7 @@ class AutoScalingConfig:
                     NetworkInterfaces(
                         # AssociateCarrierIpAddress=True,
                         DeviceIndex=0,
-                        Groups=[self.stack_op.security_group_name]
+                        Groups=[self.stack_op.security_group_name],
                     )
                 ],
                 UserData=Base64(
@@ -65,6 +65,7 @@ class AutoScalingConfig:
                         ],
                     )
                 ),
+                KeyName=self.params.key_pair_name,
                 BlockDeviceMappings=[
                     LaunchTemplateBlockDeviceMapping(
                         DeviceName="/dev/xvda", Ebs=EBSBlockDevice(VolumeType="gp3")
@@ -82,7 +83,7 @@ class AutoScalingConfig:
             "AutoScalingGroup",
             MinSize=0,
             MaxSize=3,
-            DesiredCapacity="0",
+            DesiredCapacity="1",
             # NOTE: Public subnet is attached to auto scaling group currently for initial POC
             VPCZoneIdentifier=self.stack_op.public_subnet_names.split(":"),
             LaunchTemplate=LaunchTemplateSpecification(

@@ -116,8 +116,9 @@ class Service:
     def create(self):
         try:
             echo(f'Provisioning app "{self.app}"..')
-            config = Provision.configure(self.app, self.region)
-            Provision.apply(config)
+            provision = Provision(self.app, self.region)
+            provision.configure()
+            provision.apply()
         except Exception as e:
             log_err(str(e))
 
@@ -134,4 +135,7 @@ class Container:
         self.region = region if region else self.session.region_name
 
     def push(self):
-        Provision.push(self.app, self.region)
+        Provision.push(self.app)
+
+    def release(self):
+        Provision.release(self.app)

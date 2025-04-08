@@ -1,5 +1,6 @@
 import boto3
 import subprocess
+from click import prompt
 from kobidh.utils.format import camelcase
 from botocore.exceptions import ClientError
 from kobidh.resource.config import Config, StackOutput
@@ -10,28 +11,30 @@ from kobidh.utils.logging import log, log_err, log_warning
 
 class Provision:
 
-    @staticmethod
-    def configure(name: str, region: str = None):
-        stack_op = StackOutput()
-        stack_op.validate_cloudformation_stack(name)
+    class Params:
+        def __init__(self):
+            self.key_pair_name = prompt("Key pair name: ")
 
-        config = Config(name, region)
-        config.template.set_description(
+    def __init__(self, name: str, region: str = None):
+        self.name = name
+        self.region = region
+        self.config = Config(name, region)
+        self.stack_op = StackOutput()
+        self.stack_op.validate(name)
+        self.params = Provision.Params()
+
+    def configure(self):
+        self.config.template.set_description(
             "CloudFormation template to provision application service"
         )
-
-        asg_config = AutoScalingConfig(config, stack_op)
+        asg_config = AutoScalingConfig(self.config, self.params, self.stack_op)
         asg_config._configure()
-
-        service_config = ServiceConfig(config, stack_op)
+        service_config = ServiceConfig(self.config, self.stack_op)
         service_config._configure()
 
-        return config
-
-    @staticmethod
-    def apply(config: Config):
-        cloud_client = boto3.client("cloudformation", region_name=config.region)
-        stack_name = camelcase(f"{config.name}-service-stack")
+    def apply(self):
+        cloud_client = boto3.client("cloudformation", region_name=self.config.region)
+        stack_name = camelcase(f"{self.config.name}-service-stack")
         response = None
         try:
             # Check if the stack exists
@@ -47,7 +50,7 @@ class Provision:
             # Update the existing stack
             response = cloud_client.update_stack(
                 StackName=stack_name,
-                TemplateBody=config.template.to_json(),
+                TemplateBody=self.config.template.to_json(),
                 Capabilities=["CAPABILITY_NAMED_IAM"],
             )
             log(f"Stack update initiated: {response['StackId']}")
@@ -58,7 +61,7 @@ class Provision:
                 log(f"Stack {stack_name} does not exist. Creating it...")
                 response = cloud_client.create_stack(
                     StackName=stack_name,
-                    TemplateBody=config.template.to_json(),
+                    TemplateBody=self.config.template.to_json(),
                     Capabilities=["CAPABILITY_NAMED_IAM"],
                 )
                 log(f"Stack creation initiated: {response['StackId']}")
@@ -82,8 +85,8 @@ class Provision:
         return response
 
     @staticmethod
-    def push(name: str, region: str):
-        repo_name = "tomato-repository/web"
+    def push(name: str):
+        repo_name = f"{name}-repository/web"
         tag = "1.0.2"
         # Build docker image and tag it to the repository name
         subprocess.run(["docker", "build", "-t", repo_name, "."])
@@ -113,3 +116,7 @@ class Provision:
                 f"295920452208.dkr.ecr.ap-south-1.amazonaws.com/{repo_name}",
             ]
         )
+
+    @staticmethod
+    def release(name: str):
+        pass
