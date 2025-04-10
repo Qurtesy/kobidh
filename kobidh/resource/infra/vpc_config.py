@@ -17,7 +17,6 @@ from troposphere.ec2 import (
 )
 from kobidh.utils.format import camelcase
 from kobidh.utils.logging import log, log_err
-from kobidh.resource.infra.attrs import Attrs
 from kobidh.resource.config import Config
 
 
