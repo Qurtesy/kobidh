@@ -1,0 +1,157 @@
+# Enhanced pyproject.toml for modern Python packaging
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kobidh"
+version = "1.0.0"
+description = "CLI tool for automating the deployment process of server-side applications with ease and efficiency"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Souvik Dey", email = "dsouvik141@gmail.com"}
+]
+maintainers = [
+    {name = "Souvik Dey", email = "dsouvik141@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
+keywords = ["cli", "automation", "deployment", "server-side", "devops", "aws", "docker", "containers"]
+dependencies = [
+    "click>=8.1.8",
+    "stringcase>=1.2.0", 
+    "troposphere>=4.8.3",
+    "boto3>=1.36.4",
+    "pyyaml>=6.0",
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.10.0",
+    "pytest-mock>=3.6.0",
+    "moto>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "mypy>=0.950",
+    "pre-commit>=2.15.0",
+]
+test = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.10.0", 
+    "pytest-mock>=3.6.0",
+    "moto>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Qurtesy/kobidh"
+Documentation = "https://github.com/Qurtesy/kobidh/docs"
+Repository = "https://github.com/Qurtesy/kobidh.git"
+"Bug Reports" = "https://github.com/Qurtesy/kobidh/issues"
+
+[project.scripts]
+kobidh = "kobidh.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kobidh*"]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310", "py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    ".eggs",
+    "*.egg",
+    "build",
+    "dist"
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "aws: marks tests that require AWS credentials",
+]
+
+[tool.coverage.run]
+source = ["kobidh"]
+omit = [
+    "*/tests/*",
+    "setup.py",
+    "*/venv/*",
+    "*/__pycache__/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "boto3.*",
+    "botocore.*",
+    "troposphere.*",
+    "stringcase.*",
+]
+ignore_missing_imports = true

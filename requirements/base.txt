@@ -3,3 +3,4 @@ stringcase==1.2.0
 troposphere==4.8.3
 boto3==1.36.4
 setuptools
+pyyaml>=6.0

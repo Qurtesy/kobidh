@@ -1,6 +1,0 @@
--r main.txt
-
-pre-commit
-pytest
-moto
-openapi-spec-validator
