@@ -1,8 +1,10 @@
 import os
 import boto3
 import logging
+from typing import Optional, Dict, Any
 from click import echo, prompt
 from kobidh.meta import DIR, DEFAULT_FILE
+from kobidh.exceptions import KobidhError, ConfigurationError, AWSError, DeploymentError
 from kobidh.resource.infra import Infra
 from kobidh.resource.provision import Provision
 from kobidh.utils.logging import log_err
@@ -79,31 +81,103 @@ class Core:
 
 
 class Apps:
+    """Application management for Kobidh deployment automation."""
+
     @aws_credentails
-    def __init__(self, name: str, region: str = None):
-        self.name = name
+    def __init__(self, name: str, region: Optional[str] = None):
+        """
+        Initialize Apps manager.
+
+        Args:
+            name: Application name
+            region: AWS region (optional)
+
+        Raises:
+            ConfigurationError: If application name is invalid
+        """
+        if not name or not name.strip():
+            raise ConfigurationError(
+                "Application name cannot be empty", "Provide a valid application name"
+            )
+
+        self.name = name.strip()
         self.session = boto3.session.Session()
         self.region = region if region else self.session.region_name
 
+        logger.info(
+            f"Apps manager initialized for '{self.name}' in region '{self.region}'"
+        )
+
     def create(self):
+        """Create application infrastructure with enhanced error handling."""
         try:
-            echo(f'Creating app "{self.name}" for "{self.region}"..')
+            logger.info(f"Creating infrastructure for app '{self.name}'")
+            echo(f'🚀 Creating app "{self.name}" for "{self.region}"..')
+
             config = Infra.configure(self.name, self.region)
-            echo(f'App "{self.name}" configuration created..')
+            echo(f'✅ App "{self.name}" configuration created..')
+
             Infra.apply(config.name, config.region, config.template)
-            echo(f'App "{self.name}" configuration is applied..')
+            echo(f'✅ App "{self.name}" infrastructure deployed successfully!')
+
+            logger.info(f"Successfully created app '{self.name}'")
+
         except Exception as e:
-            log_err(str(e))
+            logger.error(f"Failed to create app '{self.name}': {str(e)}")
+            if isinstance(e, KobidhError):
+                raise
+            raise DeploymentError(
+                f"Failed to create app '{self.name}': {str(e)}",
+                suggestion="Check CloudFormation console for detailed error information",
+            )
 
     def describe(self):
-        Infra.describe(self.name, self.region)
+        """Describe application infrastructure details."""
+        try:
+            logger.info(f"Describing app '{self.name}'")
+            Infra.describe(self.name, self.region)
+        except Exception as e:
+            logger.error(f"Failed to describe app '{self.name}': {str(e)}")
+            if "does not exist" in str(e).lower():
+                raise DeploymentError(
+                    f"App '{self.name}' not found",
+                    suggestion="Use 'kobidh apps.create' to create the application first",
+                )
+            raise AWSError(f"Failed to describe app: {str(e)}")
 
     def info(self):
-        Infra.info(self.name, self.region)
+        """Show application information."""
+        try:
+            logger.info(f"Getting info for app '{self.name}'")
+            Infra.info(self.name, self.region)
+        except Exception as e:
+            logger.error(f"Failed to get info for app '{self.name}': {str(e)}")
+            if "does not exist" in str(e).lower():
+                raise DeploymentError(
+                    f"App '{self.name}' not found",
+                    suggestion="Use 'kobidh apps.create' to create the application first",
+                )
+            raise AWSError(f"Failed to get app info: {str(e)}")
 
     def delete(self):
-        echo(f'Deleting app "{self.name}"..')
-        Infra.delete(self.name, self.region)
+        """Delete application and all associated resources."""
+        try:
+            logger.info(f"Deleting app '{self.name}'")
+            echo(f'🗑️ Deleting app "{self.name}"..')
+
+            Infra.delete(self.name, self.region)
+            echo(f'✅ App "{self.name}" deleted successfully!')
+
+            logger.info(f"Successfully deleted app '{self.name}'")
+
+        except Exception as e:
+            logger.error(f"Failed to delete app '{self.name}': {str(e)}")
+            if isinstance(e, KobidhError):
+                raise
+            raise DeploymentError(
+                f"Failed to delete app '{self.name}': {str(e)}",
+                suggestion="Check CloudFormation console and manually clean up resources if needed",
+            )
 
 
 class Service:
