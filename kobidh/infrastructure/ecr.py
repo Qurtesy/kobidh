@@ -1,7 +1,6 @@
 from troposphere import GetAtt, Output
 from troposphere.ecr import Repository
 from kobidh.utils.format import camelcase
-from kobidh.resource.infra.attrs import Attrs
 from kobidh.resource.config import Config
 
 

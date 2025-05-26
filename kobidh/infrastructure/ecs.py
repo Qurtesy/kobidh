@@ -1,7 +1,6 @@
 from troposphere import Ref, Output
 from troposphere.ecs import Cluster
 from kobidh.utils.format import camelcase
-from kobidh.resource.infra.attrs import Attrs
 from kobidh.resource.config import Config
 
 
